@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
+import os
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
@@ -10,7 +11,6 @@ app = Flask(__name__)
 # -------------------------------
 # LOAD DATA
 # -------------------------------
-import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 df = pd.read_csv(os.path.join(BASE_DIR, "2025_All_mobiles_Dataset.csv"))
 
@@ -43,6 +43,9 @@ features = ['price','ram','rom','battery','processor_encoded']
 X = df[features]
 y = df['rating']
 
+# -------------------------------
+# SCALING
+# -------------------------------
 scaler = MinMaxScaler()
 X_scaled = scaler.fit_transform(X)
 
@@ -64,109 +67,114 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
 
-    brand = request.form.get('brand')
-    price = request.form.get('price')
-
-    if not brand or not price:
-        return jsonify({"error": "Select brand and budget"})
-
     try:
+        brand = request.form.get('brand')
+        price = request.form.get('price')
+
+        if not brand or not price:
+            return jsonify({"error": "Select brand and budget"})
+
         price = float(price)
-    except:
-        return jsonify({"error": "Budget must be number"})
 
-    ram = request.form.get('ram')
-    rom = request.form.get('rom')
-    battery = request.form.get('battery')
-    processor_input = request.form.get('processor')
+        ram = request.form.get('ram')
+        rom = request.form.get('rom')
+        battery = request.form.get('battery')
+        processor_input = request.form.get('processor')
 
-    # -------------------------------
-    # VALIDATION
-    # -------------------------------
-    if brand == "apple":
-        if not rom:
-            return jsonify({"error": "Enter ROM for Apple"})
-        ram = float(rom)
-        rom = float(rom)
+        # -------------------------------
+        # VALIDATION
+        # -------------------------------
+        if brand == "apple":
+            if not rom:
+                return jsonify({"error": "Enter ROM for Apple"})
+            ram = float(rom)
+            rom = float(rom)
 
-    elif brand == "google":
-        if not (ram and rom and battery):
-            return jsonify({"error": "Enter RAM, ROM, Battery"})
-        ram = float(ram)
-        rom = float(rom)
-        battery = float(battery)
+        elif brand == "google":
+            if not (ram and rom and battery):
+                return jsonify({"error": "Enter RAM, ROM, Battery"})
+            ram = float(ram)
+            rom = float(rom)
+            battery = float(battery)
 
-    else:
-        if not (ram and rom and battery and processor_input):
-            return jsonify({"error": "Fill all Android fields"})
-        ram = float(ram)
-        rom = float(rom)
-        battery = float(battery)
+        else:
+            if not (ram and rom and battery and processor_input):
+                return jsonify({"error": "Fill all Android fields"})
+            ram = float(ram)
+            rom = float(rom)
+            battery = float(battery)
 
-    # -------------------------------
-    # PROCESSOR
-    # -------------------------------
-    processor = None
-    if processor_input:
-        matches = [x for x in le.classes_ if processor_input.lower() in x.lower()]
-        if matches:
-            processor = le.transform([matches[0]])[0]
+        # -------------------------------
+        # PROCESSOR MATCH
+        # -------------------------------
+        processor = None
+        if processor_input:
+            matches = [x for x in le.classes_ if processor_input.lower() in x.lower()]
+            if matches:
+                processor = le.transform([matches[0]])[0]
 
-    # -------------------------------
-    # FILTER
-    # -------------------------------
-    filtered = filtered.dropna(subset=features)
-    if brand == "apple":
-        filtered = df[
-            (df['price'] <= price * 1.02) &
-            (df['name'].str.contains('iphone', case=False))
-        ]
-
-    elif brand == "google":
-        filtered = df[
-            (df['price'] <= price * 1.01) &
-            (df['ram'] >= ram * 0.8) &
-            (df['rom'] >= rom * 0.8) &
-            (df['battery'] >= battery * 0.7) &
-            (df['brand'].str.contains('google'))
-        ]
-
-    else:
-        filtered = df[
-            (df['price'] <= price * 1.01) &
-            (df['ram'] >= ram * 0.7) &
-            (df['rom'] >= rom * 0.5) &
-            (df['battery'] >= battery * 0.6) &
-            (~df['name'].str.contains('iphone', case=False)) &
-            (~df['brand'].str.contains('google'))
-        ]
-
-        if processor is not None:
-            selected = le.inverse_transform([processor])[0]
-            temp = filtered[
-                filtered['processor'].str.contains(selected, case=False)
+        # -------------------------------
+        # FILTERING
+        # -------------------------------
+        if brand == "apple":
+            filtered = df[
+                (df['price'] <= price * 1.2) &
+                (df['name'].str.contains('iphone', case=False))
             ]
-            if not temp.empty:
-                filtered = temp
 
-    if filtered.empty:
-        return jsonify({"error": "No mobiles found"})
+        elif brand == "google":
+            filtered = df[
+                (df['price'] <= price * 1.1) &
+                (df['ram'] >= ram * 0.8) &
+                (df['rom'] >= rom * 0.8) &
+                (df['battery'] >= battery * 0.7) &
+                (df['brand'].str.contains('google'))
+            ]
 
-    # -------------------------------
-    # ML RANKING
-    # -------------------------------
-    X_f = scaler.transform(filtered[features])
+        else:
+            filtered = df[
+                (df['price'] <= price * 1.1) &
+                (df['ram'] >= ram * 0.7) &
+                (df['rom'] >= rom * 0.5) &
+                (df['battery'] >= battery * 0.6) &
+                (~df['name'].str.contains('iphone', case=False)) &
+                (~df['brand'].str.contains('google'))
+            ]
 
-    filtered = filtered.copy()
-    filtered['score'] = (
-        knn.predict(X_f) +
-        dt.predict(X_f) +
-        rf.predict(X_f)
-    ) / 3
+            if processor is not None:
+                selected = le.inverse_transform([processor])[0]
+                temp = filtered[
+                    filtered['processor'].str.contains(selected, case=False)
+                ]
+                if not temp.empty:
+                    filtered = temp
 
-    top3 = filtered.sort_values(by='score', ascending=False).head(3)
+        # -------------------------------
+        # SAFETY CHECK
+        # -------------------------------
+        filtered = filtered.dropna(subset=features)
 
-    return jsonify(top3[['name','price','ram','rom']].to_dict(orient='records'))
+        if filtered.empty:
+            return jsonify({"error": "No mobiles found"})
+
+        # -------------------------------
+        # ML PREDICTION
+        # -------------------------------
+        X_f = scaler.transform(filtered[features])
+
+        filtered = filtered.copy()
+        filtered['score'] = (
+            knn.predict(X_f) +
+            dt.predict(X_f) +
+            rf.predict(X_f)
+        ) / 3
+
+        top3 = filtered.sort_values(by='score', ascending=False).head(3)
+
+        return jsonify(top3[['name','price','ram','rom']].to_dict(orient='records'))
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 
 # -------------------------------
