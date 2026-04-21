@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Smartphone Recommendation</title>
+
+<style>
+body {
+    font-family: Arial;
+            margin: 0;
+            padding: 0;
+
+            /* 🔥 Multiple phones background */
+            background: 
+                linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
+                url("https://images.unsplash.com/photo-1510557880182-3d4d3cba35c4"),
+                url("https://images.unsplash.com/photo-1598327105666-5b89351aff97"),
+                url("https://images.unsplash.com/photo-1511707171634-5f897ff02aa9");
+
+            background-size: cover;
+            background-position: center;
+            background-blend-mode: overlay;
+
+    height: 100vh;
+    color: white;
+    text-align: center;
+}
+
+/* TITLE */
+.title-bar {
+    display: inline-flex;
+    align-items: center;
+    background: #3b5ccc;
+    padding: 10px 20px;
+    margin-top: 30px;
+    border-radius: 5px;
+}
+
+.title-text {
+    font-size: 30px;
+    font-weight: bold;
+}
+
+/* FORM */
+.container {
+    background: rgba(255,255,255,0.95);
+    color: black;
+    width: 400px;
+    margin: 40px auto;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+input, select {
+    width: 90%;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+/* BUTTON */
+button {
+    width: 90%;
+    padding: 10px;
+    margin: 10px;
+    background: #27ae60;
+    color: white;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #219150;
+}
+
+/* POPUP */
+#popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    color: black;
+    padding: 20px;
+    width: 400px;
+    border-radius: 10px;
+    z-index: 1000;
+}
+
+/* OVERLAY */
+#overlay {
+    display: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    top: 0;
+    left: 0;
+}
+</style>
+</head>
+
+<body>
+
+<div class="title-bar">
+    <div class="title-text">📱 Smartphone Recommendation</div>
+</div>
+
+<div class="container">
+
+<form id="form">
+
+<select id="brand" name="brand" onchange="updateFields()" required>
+<option value="">Select Brand</option>
+<option value="apple">Apple</option>
+<option value="google">Google</option>
+<option value="android">Android</option>
+</select>
+
+<input type="number" id="price" name="price" placeholder="Budget" disabled required>
+
+<input type="number" id="ram" name="ram" placeholder="RAM" disabled>
+<input type="number" id="rom" name="rom" placeholder="ROM" disabled>
+<input type="number" id="battery" name="battery" placeholder="Battery" disabled>
+
+<select id="processor" name="processor" disabled>
+<option value="">Processor</option>
+<option value="snapdragon">Snapdragon</option>
+<option value="dimensity">Dimensity</option>
+<option value="tensor">Tensor</option>
+<option value="exynos">Exynos</option>
+<option value="a">Apple</option>
+</select>
+
+<button type="submit">Recommend</button>
+
+</form>
+
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay"></div>
+
+<!-- POPUP -->
+<div id="popup">
+<h3>Top Recommendations</h3>
+<div id="result"></div>
+<button onclick="closePopup()">Close</button>
+</div>
+
+<script>
+function updateFields() {
+    let b = document.getElementById("brand").value;
+
+    let price = document.getElementById("price");
+    let ram = document.getElementById("ram");
+    let rom = document.getElementById("rom");
+    let battery = document.getElementById("battery");
+    let processor = document.getElementById("processor");
+
+    price.disabled = false;
+
+    ram.style.display = rom.style.display = battery.style.display = processor.style.display = "none";
+    ram.disabled = rom.disabled = battery.disabled = processor.disabled = true;
+
+    if (b === "apple") {
+        rom.style.display = "block";
+        rom.disabled = false;
+    }
+    else if (b === "google") {
+        ram.style.display = rom.style.display = battery.style.display = "block";
+        ram.disabled = rom.disabled = battery.disabled = false;
+    }
+    else if (b === "android") {
+        ram.style.display = rom.style.display = battery.style.display = processor.style.display = "block";
+        ram.disabled = rom.disabled = battery.disabled = processor.disabled = false;
+    }
+}
+
+document.getElementById("form").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    let formData = new FormData(this);
+
+    fetch("/predict", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.error) {
+            document.getElementById("result").innerHTML = "❌ " + data.error;
+        } else {
+            let html = "<table border='1' width='100%'>";
+            html += "<tr><th>Name</th><th>Price</th><th>RAM</th><th>ROM</th></tr>";
+
+            data.forEach(m => {
+                html += `<tr>
+                    <td>${m.name}</td>
+                    <td>${m.price}</td>
+                    <td>${m.ram}</td>
+                    <td>${m.rom}</td>
+                </tr>`;
+            });
+
+            html += "</table>";
+            document.getElementById("result").innerHTML = html;
+        }
+
+        document.getElementById("popup").style.display = "block";
+        document.getElementById("overlay").style.display = "block";
+    });
+});
+
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+    document.getElementById("overlay").style.display = "none";
+}
+</script>
+
+</body>
+</html>
