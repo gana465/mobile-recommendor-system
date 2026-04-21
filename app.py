@@ -10,7 +10,9 @@ app = Flask(__name__)
 # -------------------------------
 # LOAD DATA
 # -------------------------------
-df = pd.read_csv("2025_All_mobiles_Dataset.csv")
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+df = pd.read_csv(os.path.join(BASE_DIR, "2025_All_mobiles_Dataset.csv"))
 
 df.columns = ['id','name','price','rating','ram','rom',
               'rear_cam','front_cam','battery','processor']
@@ -113,6 +115,7 @@ def predict():
     # -------------------------------
     # FILTER
     # -------------------------------
+    filtered = filtered.dropna(subset=features)
     if brand == "apple":
         filtered = df[
             (df['price'] <= price * 1.02) &
